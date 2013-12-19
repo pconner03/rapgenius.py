@@ -27,7 +27,7 @@ def searchArtist(artist):
 	soup = BeautifulSoup(urlopen(searchUrl).read())
 	results = []
 	for row in soup.find_all('a', href=re.compile('/artists/.')):
-		results.append(''.join(row.findAll(text=True)))
+		results.append((''.join(row.findAll(text=True)), RAPGENIUS_URL+row.get('href')))
 	return results
 
 #converts search query into something that can be put into search URL 
@@ -44,7 +44,7 @@ def searchSong(song):
 			songs.append((''.join(row.findAll(text=True)).strip(), RAPGENIUS_URL+row.get('href')))
 	#TODO - object model
 
-	print songs
+	#print songs
 	return songs
 
 #returns string of (unannotated) lyrics, given a url
@@ -62,4 +62,7 @@ def getLyricsFromUrl(url):
 def test():
 	s = searchSong("Outkast Atliens")
 	print getLyricsFromUrl(s[0][1])
-test()
+
+
+#test()
+print searchArtist("Wayne")
