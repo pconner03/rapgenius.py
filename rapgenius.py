@@ -59,10 +59,15 @@ def getLyricsFromUrl(url):
 	return data
 
 
+def getArtistPopularSongs(url):
+	soup = BeautifulSoup(urlopen(url).read())
+	songs = []
+	for row in soup.find('ul', class_='song_list'):
+		if(type(row.find('span'))!=int):
+			songs.append((''.join(row.find('span').findAll(text=True)).strip(), RAPGENIUS_URL+row.find('a').get('href')))
+			
+	return songs
+
 def test():
 	s = searchSong("Outkast Atliens")
 	print getLyricsFromUrl(s[0][1])
-
-
-#test()
-print searchArtist("Wayne")
