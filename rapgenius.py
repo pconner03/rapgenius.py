@@ -45,7 +45,6 @@ from bs4 import BeautifulSoup
 import urllib2
 import re
 
-#TODO - this
 class artist:
 
 	def __init__(self, name, url):
@@ -75,8 +74,17 @@ class song:
 	def __init__(self, name, url):
 		self.name = name
 		self.url = url
+		#NOTE: getting artists requires redownloading/parsing the song's page
+		#this can be slow if done a lot, so I should probably figure out a way to 
+		#implement an alternative constructor, or move some of the logic into
+		#the class itself, rather than keeping it outside
+		#	
+		#I still don't know enough about "proper" python conventions
+		self.artist = getSongArtist(url)
+		self.featuredArtists = getSongFeaturedArtists(url)
 		self.rawLyrics = ""
 		#TODO - lyric + annotation stuff
+
 
 	def __str__(self):
 		return self.name + ' - ' + self.url
@@ -172,6 +180,26 @@ def getArtistSongs(url):
 					songs.append(song(''.join(pageRow.find('span').findAll(text=True)).strip(), RAPGENIUS_URL+pageRow.find('a').get('href')))
 
 	return songs
+
+def getSongArtist(url):
+	soup = BeautifulSoup(urllib2.urlopen(url).read())
+	for row in soup.find('h1', class_= 'song_title'):
+		try:
+			
+			aName = ''.join(row.findAll(text=True))
+			aURL = row.get('href')
+		except:
+			pass 
+	return artist(aName, RAPGENIUS_URL+aURL)
+
+def getSongFeaturedArtists(url):
+	artists = []
+	soup = BeautifulSoup(urllib2.urlopen(url).read())
+	for r in soup('div', {'class':'featured_artists'}):
+		for row in r.find_all('a'):
+			artists.append(artist(''.join(row.findAll(text=True)), RAPGENIUS_URL+row.get('href')))
+	return artists
+
 
 def test():
 	outkast = searchArtist("Outkast")[0]
