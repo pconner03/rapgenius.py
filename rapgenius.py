@@ -126,9 +126,9 @@ def searchSong(songName):
 	searchUrl = RAPGENIUS_SEARCH_URL+'?q='+searchUrlFormat(songName)
 	soup = BeautifulSoup(urllib2.urlopen(searchUrl).read())
 	songs = []
-	for row in soup.find_all('a', class_='song_link'): #force to ignore 'hot song' results
-		if(row.parent.get('class')!=None):
-			songs.append(song(''.join(row.findAll(text=True)).strip(), RAPGENIUS_URL+row.get('href')))
+	for row in soup.find_all('a'):
+		if(row.get("class") and "song_link" in row.get("class")):
+			songs.append(song(''.join(row.findAll(text=True)).strip(), row.get('href')))
 	#TODO - object model
 
 	#print songs
@@ -183,14 +183,10 @@ def getArtistSongs(url):
 
 def getSongArtist(url):
 	soup = BeautifulSoup(urllib2.urlopen(url).read())
-	for row in soup.find('h1', class_= 'song_title'):
-		try:
-			
-			aName = ''.join(row.findAll(text=True))
-			aURL = row.get('href')
-		except:
-			pass 
-	return artist(aName, RAPGENIUS_URL+aURL)
+	info = soup.find('div', {"class": "song_info_primary"})
+	artistInfo = info.find("span", {"class": "text_artist"})
+	#print artistInfo.find('a').get('href')
+	return artist(artistInfo.findAll(text=True), RAPGENIUS_URL+artistInfo.find('a').get('href'))
 
 def getSongFeaturedArtists(url):
 	artists = []
@@ -202,14 +198,8 @@ def getSongFeaturedArtists(url):
 
 
 def test():
-	outkast = searchArtist("Outkast")[0]
-	#print outkast.name
-	#print outkast.url
-	#outkast.getPopularSongs()
-	#for song in outkast.popularSongs:
-	#	print song.getRawLyrics()
-	outkast.getAllSongs()
-	for song in outkast.songs:
-		print song.__str__()
+	print searchSong("ATLiens")[0].getRawLyrics()
 
 #test()
+if __name__ == '__main__':
+	test()
