@@ -57,6 +57,9 @@ class artist:
 	def __str__(self):
 		return self.name + ' - ' + self.url
 
+	def __unicode__(self):
+		return self.name + ' - ' + self.url
+
 	#instantiates object's popular song array and returns it
 	def getPopularSongs(self):
 		self.popularSongs = getArtistPopularSongs(self.url)
@@ -66,6 +69,7 @@ class artist:
 	#this pretty slow right now
 	def getAllSongs(self):
 		self.songs = getArtistSongs(self.url)
+		return self.songs
 
 
 
@@ -87,6 +91,9 @@ class song:
 
 
 	def __str__(self):
+		return self.name + ' - ' + self.url
+
+	def __unicode__(self):
 		return self.name + ' - ' + self.url
 
 	def getRawLyrics(self):
@@ -149,7 +156,7 @@ def getLyricsFromUrl(url):
 def getArtistPopularSongs(url):
 	soup = BeautifulSoup(urllib2.urlopen(url).read())
 	songs = []
-	for row in soup.find('ul', class_='song_list'):
+	for row in soup.find('ul', {'class':'song_list'}):
 		if(type(row.find('span'))!=int):
 			songs.append(song(''.join(row.find('span').findAll(text=True)).strip(), RAPGENIUS_URL+row.find('a').get('href')))
 			
@@ -158,7 +165,7 @@ def getArtistPopularSongs(url):
 def getArtistSongs(url):
 	soup = BeautifulSoup(urllib2.urlopen(url).read())
 	songs = []
-	for row in soup.find('ul', class_='song_list').findNextSibling('ul'):
+	for row in soup.findAll('ul', {'class':'song_list'})[1:]:
 		try:
 			songs.append( song(''.join(row.find('span').findAll(text=True)).strip(), RAPGENIUS_URL+row.find('a').get('href') ))
 		except:
@@ -174,15 +181,19 @@ def getArtistSongs(url):
 			#print row.get('href')
 			#print url+row.get('href')
 			nextPage = BeautifulSoup(urllib2.urlopen(RAPGENIUS_URL+row.get('href')).read())
-			for pageRow in nextPage.find('ul', class_='song_list'):
+			for pageRow in nextPage.find('ul', {'class':'song_list'}):
 				if(type(pageRow.find('span'))!=int):
 					#print ''.join(pageRow.find('span').findAll(text=True)).strip()
 					songs.append(song(''.join(pageRow.find('span').findAll(text=True)).strip(), RAPGENIUS_URL+pageRow.find('a').get('href')))
-
+	#TODO figure out why there are duplicates near the end
 	return songs
 
 def getSongArtist(url):
-	soup = BeautifulSoup(urllib2.urlopen(url).read())
+	#print url
+	soup = BeautifulSoup(urllib2.urlopen(url).read(), 'html.parser')
+	#For some reason, html was damaged for http://rapgenius.com/Outkast-git-up-git-out-lyrics
+	#other songs from same artist seemed fine without specifying 'html.parser'
+	
 	info = soup.find('div', {"class": "song_info_primary"})
 	artistInfo = info.find("span", {"class": "text_artist"})
 	#print artistInfo.find('a').get('href')
@@ -198,7 +209,8 @@ def getSongFeaturedArtists(url):
 
 
 def test():
-	print searchSong("ATLiens")[0].getRawLyrics()
+	for s in searchArtist("OutKast")[0].getAllSongs():
+		print s.__unicode__()
 
 #test()
 if __name__ == '__main__':
