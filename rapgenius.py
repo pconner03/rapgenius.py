@@ -36,23 +36,30 @@
 		#Eventually (i.e. after everything else has been worked out),
 		#I could look into asynchronous/multithreaded data fetching.
 
-
-RAPGENIUS_URL = 'http://rapgenius.com'
-RAPGENIUS_SEARCH_URL = 'http://rapgenius.com/search'
-RAPGENIUS_ARTIST_URL = 'http://rapgenius.com/artists'
-
 from bs4 import BeautifulSoup
+import urllib
 import urllib2
 import re
 
-class artist:
+RAPGENIUS_URL = 'http://rapgenius.com'
+RAPGENIUS_SEARCH_PATH = 'search'
+RAPGENIUS_ARTIST_PATH = 'artists'
+QUERY_INFIX = '?'
+
+RAPGENIUS_ARTIST_URL = '/'.join((RAPGENIUS_URL, RAPGENIUS_ARTIST_PATH))
+RAPGENIUS_SEARCH_URL =  '/'.join((RAPGENIUS_URL, RAPGENIUS_SEARCH_PATH))
+
+class Artist:
+	"""
+	Container class for Rap Genius artists
+	"""
 
 	def __init__(self, name, url):
 		self.name = name
 		self.url = url
 
-		self.popularSongs = [] #array of 'popular songs' from artist's page. Initially empty.
-		self.songs = [] #array of songs on artist page that are not listed as 'popular songs.' Initially empty.
+		self._popular_songs = []
+		self._songs = []
 	
 	def __str__(self):
 		return self.name + ' - ' + self.url
@@ -60,20 +67,33 @@ class artist:
 	def __unicode__(self):
 		return self.name + ' - ' + self.url
 
-	#instantiates object's popular song array and returns it
-	def getPopularSongs(self):
-		self.popularSongs = getArtistPopularSongs(self.url)
+	@property
+	def popular_songs(self):
+		"""
+		Returns songs in the "popular" section of an artist's page
+		"""
+
+		if not self._popular_songs:
+			self._popular_songs = get_artist_popular_songs(self.url)
+		
 		return self.popularSongs
 
+	@property
+	def songs(self):
+		"""
+		Returns all songs listed for an artist
+		"""
 
-	#this pretty slow right now
-	def getAllSongs(self):
-		self.songs = getArtistSongs(self.url)
-		return self.songs
+		if not self._songs:
+			self._songs = get_artist_songs(self.url)
+		
+		return self._songs
 
 
-
-class song:
+class Song:
+	"""
+	Container class for Rap Genius songs
+	"""
 
 	def __init__(self, name, url):
 		self.name = name
@@ -84,11 +104,10 @@ class song:
 		#the class itself, rather than keeping it outside
 		#	
 		#I still don't know enough about "proper" python conventions
-		self.artist = getSongArtist(url)
-		self.featuredArtists = getSongFeaturedArtists(url)
-		self.rawLyrics = ""
+		self._artist = ""
+		self._featured_artists = ""
+		self._raw_lyrics = ""
 		#TODO - lyric + annotation stuff
-
 
 	def __str__(self):
 		return self.name + ' - ' + self.url
@@ -96,55 +115,193 @@ class song:
 	def __unicode__(self):
 		return self.name + ' - ' + self.url
 
-	def getRawLyrics(self):
-		self.rawLyrics = getLyricsFromUrl(self.url)
-		return self.rawLyrics
+	@property
+	def artist(self):
+		"""
+		Returns this song's artist
+		"""
 
-#Searches for 'artistName', returns list of matches
-#returns list of artist objects
-def searchArtist(artistName):
-	searchUrl = RAPGENIUS_SEARCH_URL+'?q='+searchUrlFormat(artistName)
-	soup = BeautifulSoup(urllib2.urlopen(searchUrl).read())
-	results = []
-	artistRe = re.compile('/artists/.')
+		if not self._artist:
+			self._artist = get_song_artist(self.url)
 
-	#if exact artist name is entered, rapgenius redirects to artist page
-	if re.match('/artists/[0-9]*/follows', soup.find('a', href=artistRe).get('href')):
-		#TODO - get actual artist name from artist url (to ensure proper capitalization, etc)
-		results.append(artist(artistName, getArtistUrl(artistName)))
+		return self._artist
 
-	for row in soup.find_all('a', href=artistRe):
-		#print ''.join(row.findAll(text=True)) + RAPGENIUS_URL+row.get('href')
-		results.append(artist(''.join(row.findAll(text=True)), RAPGENIUS_URL+row.get('href')))
-	return results
+	@property
+	def featured_artists(self): 
+		"""
+		Returns this song's featured artists
+		"""
 
-def getArtistUrl(artistName):
-	return RAPGENIUS_ARTIST_URL+"/" + artistName.replace(" ","-")#TODO - figure out other character replacements
+		#don't fetch until it's asked for
+		if not self._featured_artists:
+			self._featured_artists = get_song_featured_artists(self.url)
 
-#converts search query into something that can be put into search URL 
-def searchUrlFormat(query):
-	return query.replace(' ','+')#TODO check other cases
+		return self._featured_artists
 
-#returns array song objects
-#TODO - same problem I had with getting all artist songs. With the urlopen request,
-#		the results are paginated, and this currently only returns the first page
-#		of results. Fix this + add depth/number of results feature eventually
-def searchSong(songName):
-	searchUrl = RAPGENIUS_SEARCH_URL+'?q='+searchUrlFormat(songName)
-	soup = BeautifulSoup(urllib2.urlopen(searchUrl).read())
+	@property
+	def raw_lyrics(self):
+		"""
+		Get this song's raw, un-annotated lyrics
+		"""
+		if not self._raw_lyrics:
+			self._raw_lyrics = get_lyrics_from_url(self.url)
+		
+		return self._raw_lyrics
+
+def _get_soup(url):
+	"""
+	Fetches a page and returns it as a BeautifulSoup object
+	"""
+
+	page = urllib2.urlopen(url).read()
+	soup = BeautifulSoup(page)
+
+	return soup
+
+def _parse_search(soup):
+	"""
+	Parses Rap Genius song search results and returns a list of Song ojbects
+	"""
 	songs = []
+
 	for row in soup.find_all('a'):
 		if(row.get("class") and "song_link" in row.get("class")):
-			songs.append(song(''.join(row.findAll(text=True)).strip(), row.get('href')))
-	#TODO - object model
 
-	#print songs
+			name = ''.join(row.findAll(text=True)).strip()
+			url = row.get('href')
+			
+			song = Song(name, url)
+			
+			songs.append(song)
+
 	return songs
 
-#returns string of (unannotated) lyrics, given a url
-def getLyricsFromUrl(url):
+
+def _parse_artists(soup):
+	"""
+	Parses Rap Genius artist search results and returns a list of Artist objects
+	"""
+
+	results = []
+
+	artist_re = re.compile('/artists/.')
+
+	#if exact artist name is entered, rapgenius redirects to artist page
+	# This doesn't seem to be true anymore - IE
+	#if re.match('/artists/[0-9]*/follows', soup.find('a', href=artist_re).get('href')):
+	#	#TODO - get actual artist name from artist url (to ensure proper capitalization, etc)
+	#	url = _get_artist_url(artist)
+	#	results.append(Artist(artistName, _get_artist_url(artistName)))
+
+	for row in soup.find_all('a', href=artist_re):
+		#print ''.join(row.findAll(text=True)) + RAPGENIUS_URL+row.get('href')
+
+		name = ''.join(row.findAll(text=True))
+		url = RAPGENIUS_URL+row.get('href')
+
+		artist = Artist(name, url)
+		
+		results.append(artist)
+
+	return results
+
+def _get_next_page(soup):
+	"""
+	Gets the relative URL of the next page of paginated results
+	"""
+
+	next = None
+
+	pagination = soup.find_all('div', 'pagination', 'rel')
+
+	# Determine if the next relative link is enabled
+	relative_name = pagination[0].find_all('span')[-1]
+	next_enabled = not 'disabled' in relative_name.get('class')
+
+	# Get the url string of the next page if it's available
+	if next_enabled:
+		relative_link = pagination[0].find_all('a')[-1]
+		query = relative_link.get('href')
+		next = RAPGENIUS_URL + query
+
+	return next
+
+def _build_query_url(url, search_string):
+	"""
+	Prepare a query URL
+	"""
+
+	query_string = urllib.urlencode( {'q' : search_string})
+	search_url = QUERY_INFIX.join((url, query_string))
+
+	return search_url
+
+def _get_results(url, parser):
+	"""
+	Parses a single page Rap Genius result page and returns the resulting set
+	"""
+
+	soup = _get_soup(url)
+
+	return parser(soup)
+
+def _get_paginated_results(url, parser):
+	"""
+	Parses a paginated Rap Genius result page and returns the resulting set
+	"""
+
+	results = []
+
+	#get the first set of results
+	soup = _get_soup(url)
+	parsed = parser(soup)
+	results.extend(parsed)
+	next_page = _get_next_page(soup)
+	
+	# if there are more pages, get the rest
+	while next_page:
+		soup = _get_soup(next_page)
+		parsed = parser(soup)
+		
+		results.extend(parsed)
+		next_page = _get_next_page(soup)
+
+	return results
+
+def search_songs(search):
+	"""
+	Searches Rap Genius for all songs matching search, 
+	returns the results as a list of Song objects
+	"""
+
+	url = _build_query_url(RAPGENIUS_SEARCH_URL, search)
+	songs = _get_paginated_results(url, _parse_search)
+
+	return songs
+
+def search_artists(artist):
+	"""
+	Searches Rap Genius for all artists matching search, 
+	returns the results as a list of Artist objects
+	"""
+
+	url = _build_query_url(RAPGENIUS_SEARCH_URL, artist)
+	artists = _get_results(url, _parse_artists)
+	
+	return artists
+
+def get_artist_songs(url):
+	songs = _get_paginated_results(url, _parse_search)
+	
+	return songs
+
+def get_lyrics_from_url(url):
+	"""
+	Returns string of (unannotated) lyrics, given a URL
+	"""
+
 	#TODO - exeptions
-	soup = BeautifulSoup(urllib2.urlopen(url).read())
+	soup = _get_soup(url)
 	ret = ""
 	for row in soup('div', {'class':'lyrics'}):
 		text = ''.join(row.findAll(text=True))
@@ -153,43 +310,25 @@ def getLyricsFromUrl(url):
 	return data
 
 
-def getArtistPopularSongs(url):
-	soup = BeautifulSoup(urllib2.urlopen(url).read())
+def get_artist_popular_songs(url):
+	"""
+	Returns a list of an artist's popular songs, given a URL
+	"""
+
+	soup = _get_soup(url)
 	songs = []
 	for row in soup.find('ul', {'class':'song_list'}):
 		if(type(row.find('span'))!=int):
-			songs.append(song(''.join(row.find('span').findAll(text=True)).strip(), RAPGENIUS_URL+row.find('a').get('href')))
+			songs.append(Song(''.join(row.find('span').findAll(text=True)).strip(), RAPGENIUS_URL+row.find('a').get('href')))
 			
 	return songs
 
-def getArtistSongs(url):
-	soup = BeautifulSoup(urllib2.urlopen(url).read())
-	songs = []
-	for row in soup.findAll('ul', {'class':'song_list'})[1:]:
-		try:
-			songs.append( song(''.join(row.find('span').findAll(text=True)).strip(), RAPGENIUS_URL+row.find('a').get('href') ))
-		except:
-			#Do nothing, cheap hack
-			#TODO - see if there is a better way to do this
-			pass
-	#we currently have the first 'page' of song results
-	#Now, we have to load the rest and add it to the list
-	#Possible future feature: choosing depth (number of pages) or number of songs to load, rather than forcing everything
-	#No proper error-checking yet, so this probably breaks for some artists
-	for r in soup('div', {'class':'pagination'}):
-		for row in r.findAll('a'): #TODO - see if I can make this prettier
-			#print row.get('href')
-			#print url+row.get('href')
-			nextPage = BeautifulSoup(urllib2.urlopen(RAPGENIUS_URL+row.get('href')).read())
-			for pageRow in nextPage.find('ul', {'class':'song_list'}):
-				if(type(pageRow.find('span'))!=int):
-					#print ''.join(pageRow.find('span').findAll(text=True)).strip()
-					songs.append(song(''.join(pageRow.find('span').findAll(text=True)).strip(), RAPGENIUS_URL+pageRow.find('a').get('href')))
-	#TODO figure out why there are duplicates near the end
-	return songs
 
-def getSongArtist(url):
-	#print url
+def get_song_artist(url):
+	"""
+	Returns a song's artist, given a URL
+	"""
+
 	soup = BeautifulSoup(urllib2.urlopen(url).read(), 'html.parser')
 	#For some reason, html was damaged for http://rapgenius.com/Outkast-git-up-git-out-lyrics
 	#other songs from same artist seemed fine without specifying 'html.parser'
@@ -197,19 +336,24 @@ def getSongArtist(url):
 	info = soup.find('div', {"class": "song_info_primary"})
 	artistInfo = info.find("span", {"class": "text_artist"})
 	#print artistInfo.find('a').get('href')
-	return artist(artistInfo.findAll(text=True), RAPGENIUS_URL+artistInfo.find('a').get('href'))
+	return Artist(artistInfo.findAll(text=True), RAPGENIUS_URL+artistInfo.find('a').get('href'))
 
-def getSongFeaturedArtists(url):
+def get_song_featured_artists(url):
+	"""
+	Returns a song's featured artists (if any), given a URL
+	returns an empty list if there are none
+	"""
+
 	artists = []
-	soup = BeautifulSoup(urllib2.urlopen(url).read())
+	soup = _get_soup(url)
 	for r in soup('div', {'class':'featured_artists'}):
 		for row in r.find_all('a'):
-			artists.append(artist(''.join(row.findAll(text=True)), RAPGENIUS_URL+row.get('href')))
+			artists.append(Artist(''.join(row.findAll(text=True)), RAPGENIUS_URL+row.get('href')))
 	return artists
 
 
 def test():
-	for s in searchArtist("OutKast")[0].getAllSongs():
+	for s in search_artists("OutKast")[0].songs:
 		print s.__unicode__()
 
 #test()
