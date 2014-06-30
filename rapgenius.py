@@ -9,28 +9,10 @@
 		#more specific exceptions, handling of network issues (timeout, 404, etc), and
 		#handling of other errors I end up encountering
 
-	#URL encoding
-		#I'm really just guessing right now in things like searchUrlFormat()
-		#That's bad. I shouldn't do that
-
 	#Unicode?
 		#Again, I'm not a "real" python developer, so I'm not sure how
 		#it's magically handling unicode, or what the best practices for
 		#stuff like that are
-
-	#Really big requests
-		#Fetching "all songs" for artists with a decent-sized catalog of songs
-		#goes through all "pages" of the artist's songs, which is time consuming.
-		#A nicer approach would be to allow users to specify an optional number
-		#for either the number of 'pages' or number of songs to fetch in the request
-
-		#Similarly, song (and maybe artist) search results paginate, but I haven't
-		#tried handling this yet, so searches only give the first "page" of results.
-		#Eventually, it should behave the same as the request for all artist songs,
-		#with an optional size parameter
-
-	#Documentation
-		#Should be created, and it should be up-to-date if major changes are made to the code
 
 	#Asynchronous data fetching
 		#Eventually (i.e. after everything else has been worked out),
@@ -98,12 +80,7 @@ class Song:
 	def __init__(self, name, url):
 		self.name = name
 		self.url = url
-		#NOTE: getting artists requires redownloading/parsing the song's page
-		#this can be slow if done a lot, so I should probably figure out a way to 
-		#implement an alternative constructor, or move some of the logic into
-		#the class itself, rather than keeping it outside
-		#	
-		#I still don't know enough about "proper" python conventions
+
 		self._artist = ""
 		self._featured_artists = ""
 		self._raw_lyrics = ""
@@ -158,6 +135,7 @@ def _get_soup(url):
 
 	return soup
 
+# Parser functions for _get_results() and _get_paginated_results()
 def _parse_search(soup):
 	"""
 	Parses Rap Genius song search results and returns a list of Song ojbects
@@ -168,14 +146,13 @@ def _parse_search(soup):
 		if(row.get("class") and "song_link" in row.get("class")):
 
 			name = ''.join(row.findAll(text=True)).strip()
-			url = row.get('href')
+			url = RAPGENIUS_URL + row.get('href')
 			
 			song = Song(name, url)
 			
 			songs.append(song)
 
 	return songs
-
 
 def _parse_artists(soup):
 	"""
@@ -186,15 +163,7 @@ def _parse_artists(soup):
 
 	artist_re = re.compile('/artists/.')
 
-	#if exact artist name is entered, rapgenius redirects to artist page
-	# This doesn't seem to be true anymore - IE
-	#if re.match('/artists/[0-9]*/follows', soup.find('a', href=artist_re).get('href')):
-	#	#TODO - get actual artist name from artist url (to ensure proper capitalization, etc)
-	#	url = _get_artist_url(artist)
-	#	results.append(Artist(artistName, _get_artist_url(artistName)))
-
 	for row in soup.find_all('a', href=artist_re):
-		#print ''.join(row.findAll(text=True)) + RAPGENIUS_URL+row.get('href')
 
 		name = ''.join(row.findAll(text=True))
 		url = RAPGENIUS_URL+row.get('href')
@@ -232,10 +201,11 @@ def _build_query_url(url, search_string):
 	"""
 
 	query_string = urllib.urlencode( {'q' : search_string})
-	search_url = QUERY_INFIX.join((url, query_string))
+	query_url = QUERY_INFIX.join((url, query_string))
 
-	return search_url
+	return query_url
 
+# Result getters
 def _get_results(url, parser):
 	"""
 	Parses a single page Rap Genius result page and returns the resulting set
@@ -268,6 +238,7 @@ def _get_paginated_results(url, parser):
 
 	return results
 
+# Search functions
 def search_songs(search):
 	"""
 	Searches Rap Genius for all songs matching search, 
@@ -290,25 +261,11 @@ def search_artists(artist):
 	
 	return artists
 
+# Artist-specific functions
 def get_artist_songs(url):
 	songs = _get_paginated_results(url, _parse_search)
 	
 	return songs
-
-def get_lyrics_from_url(url):
-	"""
-	Returns string of (unannotated) lyrics, given a URL
-	"""
-
-	#TODO - exeptions
-	soup = _get_soup(url)
-	ret = ""
-	for row in soup('div', {'class':'lyrics'}):
-		text = ''.join(row.findAll(text=True))
-		data = text.strip() +'\n'
-		ret += data
-	return data
-
 
 def get_artist_popular_songs(url):
 	"""
@@ -323,6 +280,20 @@ def get_artist_popular_songs(url):
 			
 	return songs
 
+# Song-specific functions
+def get_lyrics_from_url(url):
+	"""
+	Returns string of (unannotated) lyrics, given a URL
+	"""
+
+	#TODO - exeptions
+	soup = _get_soup(url)
+	ret = ""
+	for row in soup('div', {'class':'lyrics'}):
+		text = ''.join(row.findAll(text=True))
+		data = text.strip() +'\n'
+		ret += data
+	return data
 
 def get_song_artist(url):
 	"""
