@@ -146,7 +146,8 @@ def _parse_search(soup):
 		if(row.get("class") and "song_link" in row.get("class")):
 
 			name = ''.join(row.findAll(text=True)).strip()
-			url = RAPGENIUS_URL + row.get('href')
+			
+			url = row.get('href')
 			
 			song = Song(name, url)
 			
@@ -322,9 +323,9 @@ def get_song_featured_artists(url):
 			artists.append(Artist(''.join(row.findAll(text=True)), RAPGENIUS_URL+row.get('href')))
 	return artists
 
-
+#G-Unit testing
 def test():
-	for s in search_artists("OutKast")[0].songs:
+	for s in search_artists("50 Cent")[0].songs:
 		print s.__unicode__()
 
 #test()
