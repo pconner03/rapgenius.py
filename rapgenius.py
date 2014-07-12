@@ -23,13 +23,14 @@ import urllib
 import urllib2
 import re
 
-RAPGENIUS_URL = 'http://rapgenius.com'
+RAPGENIUS_URL = 'http://rap.genius.com'
+GENIUS_URL = 'http://genius.com'
 RAPGENIUS_SEARCH_PATH = 'search'
 RAPGENIUS_ARTIST_PATH = 'artists'
 QUERY_INFIX = '?'
 
-RAPGENIUS_ARTIST_URL = '/'.join((RAPGENIUS_URL, RAPGENIUS_ARTIST_PATH))
-RAPGENIUS_SEARCH_URL =  '/'.join((RAPGENIUS_URL, RAPGENIUS_SEARCH_PATH))
+RAPGENIUS_ARTIST_URL = '/'.join((GENIUS_URL, RAPGENIUS_ARTIST_PATH))
+RAPGENIUS_SEARCH_URL =  '/'.join((GENIUS_URL, RAPGENIUS_SEARCH_PATH))
 
 class Artist:
 	"""
@@ -130,10 +131,7 @@ def _get_soup(url):
 	Fetches a page and returns it as a BeautifulSoup object
 	"""
 
-	page = urllib2.urlopen(url).read()
-	soup = BeautifulSoup(page)
-
-	return soup
+	return spoof_open_bs(url)
 
 # Parser functions for _get_results() and _get_paginated_results()
 def _parse_search(soup):
@@ -322,6 +320,12 @@ def get_song_featured_artists(url):
 		for row in r.find_all('a'):
 			artists.append(Artist(''.join(row.findAll(text=True)), RAPGENIUS_URL+row.get('href')))
 	return artists
+
+def spoof_open_bs(url):
+	#http://stackoverflow.com/questions/13720430/issue-scraping-with-beautiful-soup
+	opener = urllib2.build_opener()
+	opener.addheaders = [('User-Agent', 'Mozilla/5.0')]
+	return BeautifulSoup(opener.open(url).read())
 
 #G-Unit testing
 def test():
