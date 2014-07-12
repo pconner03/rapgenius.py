@@ -329,7 +329,7 @@ def spoof_open_bs(url):
 
 #G-Unit testing
 def test():
-	print search_artists("50 Cent")[0].songs:
+	for s in search_artists("50 Cent")[0].songs:
 		print s.__unicode__()
 
 #test()
