@@ -145,7 +145,7 @@ def _parse_search(soup):
 
 			name = ''.join(row.findAll(text=True)).strip()
 			
-			url = row.get('href')
+			url = GENIUS_URL + row.get('href')
 			
 			song = Song(name, url)
 			
@@ -329,7 +329,7 @@ def spoof_open_bs(url):
 
 #G-Unit testing
 def test():
-	for s in search_artists("50 Cent")[0].songs:
+	print search_artists("50 Cent")[0].songs:
 		print s.__unicode__()
 
 #test()
