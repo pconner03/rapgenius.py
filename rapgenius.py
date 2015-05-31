@@ -31,6 +31,7 @@ QUERY_INFIX = '?'
 
 RAPGENIUS_ARTIST_URL = '/'.join((GENIUS_URL, RAPGENIUS_ARTIST_PATH))
 RAPGENIUS_SEARCH_URL =  '/'.join((GENIUS_URL, RAPGENIUS_SEARCH_PATH))
+RAPGENIUS_ARTIST_SEARCH_URL = '/'.join((RAPGENIUS_SEARCH_URL, RAPGENIUS_ARTIST_PATH))
 
 class Artist:
 	"""
@@ -145,7 +146,7 @@ def _parse_search(soup):
 
 			name = ''.join(row.findAll(text=True)).strip()
 			
-			url = GENIUS_URL + row.get('href')
+			url = row.get('href')
 			
 			song = Song(name, url)
 			
@@ -165,7 +166,7 @@ def _parse_artists(soup):
 	for row in soup.find_all('a', href=artist_re):
 
 		name = ''.join(row.findAll(text=True))
-		url = RAPGENIUS_URL+row.get('href')
+		url = row.get('href')
 
 		artist = Artist(name, url)
 		
@@ -203,6 +204,7 @@ def _build_query_url(url, search_string):
 	query_url = QUERY_INFIX.join((url, query_string))
 
 	return query_url
+
 
 # Result getters
 def _get_results(url, parser):
@@ -255,7 +257,7 @@ def search_artists(artist):
 	returns the results as a list of Artist objects
 	"""
 
-	url = _build_query_url(RAPGENIUS_SEARCH_URL, artist)
+	url = _build_query_url(RAPGENIUS_ARTIST_SEARCH_URL, artist)
 	artists = _get_results(url, _parse_artists)
 	
 	return artists
@@ -331,6 +333,8 @@ def spoof_open_bs(url):
 def test():
 	for s in search_artists("50 Cent")[0].songs:
 		print s.__unicode__()
+	print "----------------------"
+	print s.raw_lyrics
 
 #test()
 if __name__ == '__main__':
